@@ -290,12 +290,15 @@ class ScheduledHyperParamSetter(HyperParamSetter):
 
 class HyperParamSetterWithFunc(HyperParamSetter):
     """ Set the parameter by a function of epoch num and old value. """
-    def __init__(self, param, func):
+    def __init__(self, param, func, step_based=False):
         """
         Args:
             param: same as in :class:`HyperParamSetter`.
             func: ``param`` will be set by ``new_value = func(epoch_num, old_value)``.
                 ``epoch_num`` is the number of epochs that have finished.
+            step_based (bool): update ``param`` every step instead of every epoch,
+                e.g. ``new_value = func(global_step, old_value)``.
+                ``global_step`` is the number of steps that have finished.
 
         Example:
             Decrease by a factor of 0.9 every two epochs:
@@ -307,10 +310,20 @@ class HyperParamSetterWithFunc(HyperParamSetter):
         """
         super(HyperParamSetterWithFunc, self).__init__(param)
         self.f = func
+        self._step = step_based
 
     def _get_value_to_set(self):
+        if self._step:
+            return self.f(self.global_step, self.get_current_value())
         return self.f(self.epoch_num, self.get_current_value())
 
+    def _trigger_epoch(self):
+        if not self._step:
+            self.trigger()
+
+    def _trigger_step(self):
+        if self._step:
+            self.trigger()
 
 class StatMonitorParamSetter(HyperParamSetter):
     """
